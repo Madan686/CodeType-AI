@@ -2,20 +2,57 @@
 
 {% block content %}
 
-<section class="hero">
+<section class="typing-page">
 
-    <h1>
-        CodeType AI
-    </h1>
+    <div class="top-section">
 
-    <p>
-        Smart code typing trainer for CS students and developers.
-    </p>
+        <h1>
+            CodeType AI
+        </h1>
 
-    <button class="start-btn">
-        Start Practicing
-    </button>
+        <div class="stats-container">
+
+            <div class="stat-box">
+                <span>Time</span>
+                <h2 id="timer">60</h2>
+            </div>
+
+            <div class="stat-box">
+                <span>WPM</span>
+                <h2 id="wpm">0</h2>
+            </div>
+
+            <div class="stat-box">
+                <span>Accuracy</span>
+                <h2 id="accuracy">100%</h2>
+            </div>
+
+            <div class="stat-box">
+                <span>Errors</span>
+                <h2 id="errors">0</h2>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="typing-container">
+
+        <pre id="code-display"></pre>
+
+        <input
+            type="text"
+            id="hidden-input"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+        >
+
+    </div>
 
 </section>
+
+<script src="{{ url_for('static', filename='js/typing-engine.js') }}"></script>
 
 {% endblock %}
