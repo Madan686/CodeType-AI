@@ -1,22 +1,3 @@
-const snippet = `def binary_search(arr, target):
-    left = 0
-    right = len(arr) - 1
-
-    while left <= right:
-        mid = (left + right) // 2
-
-        if arr[mid] == target:
-            return mid
-
-        elif arr[mid] < target:
-            left = mid + 1
-
-        else:
-            right = mid - 1
-
-    return -1`;
-
-
 const codeDisplay = document.getElementById("code-display");
 
 const hiddenInput = document.getElementById("hidden-input");
@@ -32,6 +13,12 @@ const errorsElement = document.getElementById("errors");
 const restartBtn = document.getElementById("restart-btn");
 
 const statusMessage = document.getElementById("status-message");
+
+const interruptModal = document.getElementById("interrupt-modal");
+
+const interruptInput = document.getElementById("interrupt-input");
+
+const ghostCaret = document.getElementById("ghost-caret");
 
 
 let currentIndex;
@@ -51,6 +38,16 @@ let timerStarted;
 let timerInterval;
 
 let testCompleted;
+
+let ghostRecording;
+
+let replayTimeouts= [];
+
+let snippet="";
+
+let interruptionTimeout;
+
+let isPaused = false;
 
 
 function initializeState() {
@@ -81,6 +78,8 @@ function initializeState() {
 
     statusMessage.innerText = "";
 
+    ghostRecording = [];
+
 }
 
 
@@ -103,6 +102,36 @@ function renderSnippet() {
         codeDisplay.appendChild(span);
 
     });
+
+}
+
+async function loadSnippet() {
+
+    try {
+
+        const response =
+            await fetch("/random-snippet");
+
+        const data =
+            await response.json();
+
+        snippet = data.code;
+
+        renderSnippet();
+
+        const spans =
+            codeDisplay.querySelectorAll("span");
+
+        updateCaret(spans);
+
+    } catch (error) {
+
+        console.error(
+            "Failed to load snippet:",
+            error
+        );
+
+    }
 
 }
 
@@ -175,6 +204,8 @@ async function endTest(message) {
 
     clearInterval(timerInterval);
 
+    clearTimeout(interruptionTimeout);
+
     const sessionData = {
 
         wpm: parseInt(wpmElement.innerText),
@@ -186,7 +217,9 @@ async function endTest(message) {
 
         total_errors: totalErrors,
 
-        total_typed: totalTyped
+        total_typed: totalTyped,
+
+        ghost_data: ghostRecording
     };
 
     try {
@@ -206,6 +239,8 @@ async function endTest(message) {
 
         console.log(result.message);
 
+        loadDashboard();
+
     } catch (error) {
 
         console.error("Failed to save session:", error);
@@ -221,7 +256,7 @@ function resetTest() {
 
     initializeState();
 
-    renderSnippet();
+    loadSnippet();
 
     const spans = codeDisplay.querySelectorAll("span");
 
@@ -235,8 +270,178 @@ function resetTest() {
 
 }
 
+async function loadDashboard(){
+    try{
+        const response = await fetch("/sessions");
+        const sessions = await response.json();
+        renderDashboard(sessions);
+    } catch(error) {
+        console.error("Failed to load dashboard: ", error);
+    }
+}
+
+function renderDashboard(sessions) {
+
+    const historyBody = document.getElementById(
+        "session-history-body"
+    );
+
+    const bestWpmElement = document.getElementById(
+        "best-wpm"
+    );
+
+    const bestAccuracyElement = document.getElementById(
+        "best-accuracy"
+    );
+
+    const totalTestsElement = document.getElementById(
+        "total-tests"
+    );
+
+    const averageWpmElement = document.getElementById(
+        "average-wpm"
+    );
+
+    historyBody.innerHTML = "";
+
+    if (sessions.length === 0) {
+
+    return;
+
+}
+
+startGhostReplay(
+    sessions[0].ghost_data
+);
+
+function scheduleInterruption() {
+
+    console.log("Interruption Scheduled");
+
+    clearTimeout(interruptionTimeout);
+
+    const randomDelay =
+        Math.floor(
+            Math.random() * 10000
+        ) + 5000;
+
+    interruptionTimeout =
+        setTimeout(() => {
+
+            triggerInterruption();
+
+        }, randomDelay);
+
+}
+
+function triggerInterruption() {
+
+    if (testCompleted) return;
+
+    isPaused = true;
+
+    interruptModal.style.display = "flex";
+
+    interruptInput.value = "";
+
+    interruptInput.focus();
+
+}
+
+
+let bestWpm = 0;
+
+let bestAccuracy = 0;
+
+    let totalWpm = 0;
+
+    sessions.forEach((session) => {
+
+        if (session.wpm > bestWpm) {
+            bestWpm = session.wpm;
+        }
+
+        if (session.accuracy > bestAccuracy) {
+            bestAccuracy = session.accuracy;
+        }
+
+        totalWpm += session.wpm;
+
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td>${session.wpm}</td>
+            <td>${session.accuracy}%</td>
+            <td>${session.total_errors}</td>
+            <td>${session.total_typed}</td>
+            <td>${session.created_at}</td>
+        `;
+
+        historyBody.appendChild(row);
+
+    });
+
+    const averageWpm = Math.round(
+        totalWpm / sessions.length
+    );
+
+    bestWpmElement.innerText = bestWpm;
+
+    bestAccuracyElement.innerText =
+        `${bestAccuracy}%`;
+
+    totalTestsElement.innerText =
+        sessions.length;
+
+    averageWpmElement.innerText =
+        averageWpm;
+
+}
+
+function startGhostReplay(ghostData) {
+
+    replayTimeouts.forEach((timeout) => {
+
+        clearTimeout(timeout);
+
+    });
+
+    replayTimeouts = [];
+
+    const spans =
+        codeDisplay.querySelectorAll("span");
+
+    ghostData.forEach((time, index) => {
+
+        const timeout = setTimeout(() => {
+
+            const span = spans[index];
+
+            if (!span) return;
+
+            const rect =
+                span.getBoundingClientRect();
+
+            const containerRect =
+                codeDisplay.getBoundingClientRect();
+
+            ghostCaret.style.left =
+                `${rect.left - containerRect.left}px`;
+
+            ghostCaret.style.top =
+                `${rect.top - containerRect.top}px`;
+
+        }, time);
+
+        replayTimeouts.push(timeout);
+
+    });
+
+}
 
 hiddenInput.addEventListener("keydown", (event) => {
+
+    if (isPaused) return;
 
     if (testCompleted) return;
 
@@ -249,6 +454,8 @@ hiddenInput.addEventListener("keydown", (event) => {
         startTimer();
 
         timerStarted = true;
+
+        scheduleInterruption();
 
     }
 
@@ -266,7 +473,7 @@ hiddenInput.addEventListener("keydown", (event) => {
 
             if (currentSpan.classList.contains("incorrect")) {
 
-                activeErrorsrrors--;
+                activeErrors--;
 
 
             }
@@ -302,6 +509,9 @@ hiddenInput.addEventListener("keydown", (event) => {
     const currentSpan = spans[currentIndex];
 
     totalTyped++;
+
+    const elapsedTime = new Date() - startTime;
+    ghostRecording.push(elapsedTime);
 
     currentSpan.classList.remove("correct");
     currentSpan.classList.remove("incorrect");
@@ -350,11 +560,36 @@ document.addEventListener("click", () => {
 
 });
 
+interruptInput.addEventListener(
+    "keydown",
+    (event) => {
+
+        if (event.key !== "Enter") {
+            return;
+        }
+
+        const value =
+            interruptInput.value.trim();
+
+        if (value === "dismiss alert") {
+
+            interruptModal.style.display =
+                "none";
+
+            isPaused = false;
+
+            hiddenInput.focus();
+
+            scheduleInterruption();
+
+        }
+
+    }
+);
+
 
 initializeState();
 
-renderSnippet();
+loadSnippet();
 
-const initialSpans = codeDisplay.querySelectorAll("span");
-
-updateCaret(initialSpans);
+loadDashboard();

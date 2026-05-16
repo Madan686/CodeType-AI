@@ -40,6 +40,8 @@
 
         <pre id="code-display"></pre>
 
+        <div id="ghost-caret"></div>
+
         <input
             type="text"
             id="hidden-input"
@@ -54,6 +56,88 @@
         <button id="restart-btn"> Restart Test</button>
         <p id="status-message"></p>
     </div>
+
+    <div class="dashboard-section">
+
+    <h2 class="dashboard-title">
+        Performance Dashboard
+    </h2>
+
+    <div class="analytics-grid">
+
+        <div class="analytics-card">
+            <span>Best WPM</span>
+            <h3 id="best-wpm">0</h3>
+        </div>
+
+        <div class="analytics-card">
+            <span>Best Accuracy</span>
+            <h3 id="best-accuracy">0%</h3>
+        </div>
+
+        <div class="analytics-card">
+            <span>Total Tests</span>
+            <h3 id="total-tests">0</h3>
+        </div>
+
+        <div class="analytics-card">
+            <span>Average WPM</span>
+            <h3 id="average-wpm">0</h3>
+        </div>
+
+    </div>
+
+    <div class="history-section">
+
+        <h2>Recent Sessions</h2>
+
+        <table class="history-table">
+
+            <thead>
+
+                <tr>
+                    <th>WPM</th>
+                    <th>Accuracy</th>
+                    <th>Errors</th>
+                    <th>Total Typed</th>
+                    <th>Date</th>
+                </tr>
+
+            </thead>
+
+            <tbody id="session-history-body">
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<div id="interrupt-modal">
+
+    <div class="interrupt-box">
+
+        <h2>
+            SYSTEM INTERRUPTION
+        </h2>
+
+        <p>
+            Type:
+            <strong>dismiss alert</strong>
+            to continue
+        </p>
+
+        <input
+            type="text"
+            id="interrupt-input"
+            autocomplete="off"
+        >
+
+    </div>
+
+</div>
 
 </section>
 

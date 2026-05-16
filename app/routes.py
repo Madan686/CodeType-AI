@@ -6,9 +6,12 @@ from flask import (
 
 from app.database.models import (
     db,
-    TypingSession
+    TypingSession,
+    CodeSnippet
 )
 
+import json
+import random
 
 def register_routes(app):
 
@@ -27,7 +30,8 @@ def register_routes(app):
             wpm=data["wpm"],
             accuracy=data["accuracy"],
             total_errors=data["total_errors"],
-            total_typed=data["total_typed"]
+            total_typed=data["total_typed"],
+            ghost_data=json.dumps(data["ghost_data"])
         )
 
         db.session.add(new_session)
@@ -50,3 +54,17 @@ def register_routes(app):
             session.to_dict()
             for session in sessions
         ])
+    
+    @app.route("/random-snippet")
+    def random_snippet():
+
+        snippets = CodeSnippet.query.all()
+        
+        if not snippets:
+            return jsonify({
+                "message": "No snippets available"
+            }), 404
+
+        snippet = random.choice(snippets)
+
+        return jsonify(snippet.to_dict())
