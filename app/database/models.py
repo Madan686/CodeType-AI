@@ -1,52 +1,74 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-import json
 
-db= SQLAlchemy()
+
+db = SQLAlchemy()
+
+
+class Snippet(db.Model):
+
+    __tablename__ = "snippets"
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    language = db.Column(
+        db.String(50),
+        nullable=False
+    )
+
+    difficulty = db.Column(
+        db.String(50),
+        nullable=False
+    )
+
+    topic = db.Column(
+        db.String(100),
+        nullable=False
+    )
+
+    code = db.Column(
+        db.Text,
+        nullable=False
+    )
+
 
 class TypingSession(db.Model):
-    id=db.Column(db.Integer, primary_key=True)
 
-    wpm=db.Column(db.Integer, nullable=False)
+    __tablename__ = "typing_sessions"
 
-    accuracy=db.Column(db.Float, nullable=False)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
-    total_errors=db.Column(db.Integer, nullable=False)
+    wpm = db.Column(
+        db.Integer,
+        nullable=False
+    )
 
-    total_typed=db.Column(db.Integer, nullable=False)
+    accuracy = db.Column(
+        db.Float,
+        nullable=False
+    )
 
-    ghost_data=db.Column(db.Text, nullable=False)
+    total_errors = db.Column(
+        db.Integer,
+        nullable=False
+    )
 
-    created_at=db.Column(db.DateTime, default=datetime.utcnow)
+    total_typed = db.Column(
+        db.Integer,
+        nullable=False
+    )
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "wpm": self.wpm,
-            "accuracy": self.accuracy,
-            "total_errors": self.total_errors,
-            "total_typed": self.total_typed,
-            "ghost_data": json.loads(self.ghost_data),
-            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M")
-        }
-    
-class CodeSnippet(db.Model):
+    language = db.Column(
+        db.String(50),
+        nullable=False
+    )
 
-    id=db.Column(db.Integer, primary_key=True)
-
-    title=db.Column(db.String(200), nullable=False)
-
-    language=db.Column(db.String(50), nullable=False)
-
-    difficulty=db.Column(db.String(50), nullable=False)
-
-    code=db.Column(db.Text, nullable=False)
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "title": self.title,
-            "language": self.language,
-            "difficulty": self.difficulty,
-            "code": self.code
-        }
+    created_at = db.Column(
+        db.DateTime,
+        server_default=db.func.now()
+    )

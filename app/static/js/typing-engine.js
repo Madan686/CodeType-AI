@@ -14,18 +14,13 @@ const restartBtn = document.getElementById("restart-btn");
 
 const statusMessage = document.getElementById("status-message");
 
-const interruptModal = document.getElementById("interrupt-modal");
-
-const interruptInput = document.getElementById("interrupt-input");
-
 const ghostCaret = document.getElementById("ghost-caret");
 
+const languageSelect = document.getElementById("language-select");
 
 let currentIndex;
 
 let totalErrors;
-
-let activeErrors;
 
 let totalTyped;
 
@@ -41,22 +36,26 @@ let testCompleted;
 
 let ghostRecording;
 
-let replayTimeouts= [];
+let replayTimeouts = [];
 
-let snippet="";
+let snippet = "";
 
-let interruptionTimeout;
+let previousKey = null;
 
-let isPaused = false;
+let previousKeyTime = null;
+
+let keyLatencyMap = {};
+
+let totalPausedTime = 0;
+
+let tabInsertedPositions = [];
 
 
 function initializeState() {
 
     currentIndex = 0;
 
-    totalErrors=0;
-
-    activeErrors = 0;
+    totalErrors = 0;
 
     totalTyped = 0;
 
@@ -80,6 +79,14 @@ function initializeState() {
 
     ghostRecording = [];
 
+    previousKey = null;
+
+    previousKeyTime = null;
+
+    keyLatencyMap = {};
+
+    tabInsertedPositions = [];
+
 }
 
 
@@ -92,11 +99,17 @@ function renderSnippet() {
         const span = document.createElement("span");
 
         if (char === " ") {
+
             span.innerHTML = "&nbsp;";
+
         } else if (char === "\n") {
+
             span.innerHTML = "\n";
+
         } else {
+
             span.textContent = char;
+
         }
 
         codeDisplay.appendChild(span);
@@ -105,12 +118,18 @@ function renderSnippet() {
 
 }
 
+
 async function loadSnippet() {
 
     try {
 
+        const selectedLanguage =
+            languageSelect.value;
+
         const response =
-            await fetch("/random-snippet");
+            await fetch(
+                `/random-snippet?language=${selectedLanguage}`
+            );
 
         const data =
             await response.json();
@@ -135,6 +154,7 @@ async function loadSnippet() {
 
 }
 
+
 function updateCaret(spans) {
 
     spans.forEach((span) => {
@@ -145,7 +165,8 @@ function updateCaret(spans) {
 
     if (spans[currentIndex]) {
 
-        spans[currentIndex].classList.add("current");
+        spans[currentIndex]
+            .classList.add("current");
 
     }
 
@@ -177,19 +198,36 @@ function calculateStats() {
 
     const currentTime = new Date();
 
-    const elapsedMinutes = (currentTime - startTime) / 1000 / 60;
+    const elapsedMilliseconds =
+        (currentTime - startTime)
+        - totalPausedTime;
+
+    const elapsedMinutes =
+        elapsedMilliseconds / 1000 / 60;
 
     const wordsTyped = totalTyped / 5;
 
-    const wpm = Math.round(wordsTyped / elapsedMinutes);
+    let wpm = 0;
 
-    wpmElement.innerText = wpm || 0;
+    if (elapsedMinutes > 0.02) {
 
-    const correctChars = totalTyped - activeErrors;
+        wpm = Math.round(
+            wordsTyped / elapsedMinutes
+        );
 
-    const accuracy = Math.round((correctChars / totalTyped) * 100);
+    }
 
-    accuracyElement.innerText = `${accuracy || 0}%`;
+    wpmElement.innerText = wpm;
+
+    const correctChars =
+        totalTyped - totalErrors;
+
+    const accuracy = Math.round(
+        (correctChars / totalTyped) * 100
+    );
+
+    accuracyElement.innerText =
+        `${accuracy || 0}%`;
 
 }
 
@@ -204,38 +242,57 @@ async function endTest(message) {
 
     clearInterval(timerInterval);
 
-    clearTimeout(interruptionTimeout);
+    const weakTransitions =
+        analyzeWeakTransitions();
+
+    const recommendations =
+        generateRecommendations(
+            weakTransitions
+        );
+
+    renderRecommendations(
+        recommendations
+    );
 
     const sessionData = {
 
-        wpm: parseInt(wpmElement.innerText),
+    wpm: parseInt(
+        wpmElement.innerText
+    ),
 
-        accuracy: parseFloat(
-            accuracyElement.innerText
-                .replace("%", "")
-        ),
+    accuracy: parseFloat(
+        accuracyElement.innerText
+            .replace("%", "")
+    ),
 
-        total_errors: totalErrors,
+    total_errors: totalErrors,
 
-        total_typed: totalTyped,
+    total_typed: totalTyped,
 
-        ghost_data: ghostRecording
-    };
+    language: languageSelect.value,
 
+    ghost_data: ghostRecording
+};
     try {
 
-        const response = await fetch("/save-session", {
+        const response =
+            await fetch("/save-session", {
 
-            method: "POST",
+                method: "POST",
 
-            headers: {
-                "Content-Type": "application/json"
-            },
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
 
-            body: JSON.stringify(sessionData)
-        });
+                body: JSON.stringify(
+                    sessionData
+                )
 
-        const result = await response.json();
+            });
+
+        const result =
+            await response.json();
 
         console.log(result.message);
 
@@ -243,7 +300,10 @@ async function endTest(message) {
 
     } catch (error) {
 
-        console.error("Failed to save session:", error);
+        console.error(
+            "Failed to save session:",
+            error
+        );
 
     }
 
@@ -258,10 +318,6 @@ function resetTest() {
 
     loadSnippet();
 
-    const spans = codeDisplay.querySelectorAll("span");
-
-    updateCaret(spans);
-
     hiddenInput.disabled = false;
 
     hiddenInput.value = "";
@@ -270,104 +326,224 @@ function resetTest() {
 
 }
 
-async function loadDashboard(){
-    try{
-        const response = await fetch("/sessions");
-        const sessions = await response.json();
+
+async function loadDashboard() {
+
+    try {
+
+        const response =
+            await fetch("/sessions");
+
+        const sessions =
+            await response.json();
+
         renderDashboard(sessions);
-    } catch(error) {
-        console.error("Failed to load dashboard: ", error);
+
+    } catch (error) {
+
+        console.error(
+            "Failed to load dashboard:",
+            error
+        );
+
     }
+
 }
+
+
+function analyzeWeakTransitions() {
+
+    const weakTransitions = [];
+
+    for (const transition in keyLatencyMap) {
+
+        const latencies =
+            keyLatencyMap[transition];
+
+        const total =
+            latencies.reduce(
+                (sum, value) =>
+                    sum + value,
+                0
+            );
+
+        const average =
+            total / latencies.length;
+
+        weakTransitions.push({
+
+            transition,
+
+            averageLatency: average
+
+        });
+
+    }
+
+    weakTransitions.sort(
+        (a, b) =>
+            b.averageLatency -
+            a.averageLatency
+    );
+
+    return weakTransitions.slice(0, 5);
+
+}
+
+
+function generateRecommendations(
+    weakTransitions
+) {
+
+    const recommendations = [];
+
+    weakTransitions.forEach((item) => {
+
+        const transition =
+            item.transition;
+
+        if (
+            transition.includes("{") ||
+            transition.includes("}")
+        ) {
+
+            recommendations.push(
+                "Practice curly brace formatting"
+            );
+
+        }
+
+        if (
+            transition.includes("[") ||
+            transition.includes("]")
+        ) {
+
+            recommendations.push(
+                "Practice array bracket typing"
+            );
+
+        }
+
+        if (
+            transition.includes("(") ||
+            transition.includes(")")
+        ) {
+
+            recommendations.push(
+                "Improve function call rhythm"
+            );
+
+        }
+
+        if (
+            transition.includes("\n")
+        ) {
+
+            recommendations.push(
+                "Practice indentation consistency"
+            );
+
+        }
+
+    });
+
+    return [...new Set(recommendations)];
+
+}
+
+
+function renderRecommendations(
+    recommendations
+) {
+
+    const recommendationList =
+        document.getElementById(
+            "recommendation-list"
+        );
+
+    recommendationList.innerHTML = "";
+
+    recommendations.forEach((item) => {
+
+        const li =
+            document.createElement("li");
+
+        li.innerText = item;
+
+        recommendationList.appendChild(li);
+
+    });
+
+}
+
 
 function renderDashboard(sessions) {
 
-    const historyBody = document.getElementById(
-        "session-history-body"
-    );
+    const historyBody =
+        document.getElementById(
+            "session-history-body"
+        );
 
-    const bestWpmElement = document.getElementById(
-        "best-wpm"
-    );
+    const bestWpmElement =
+        document.getElementById(
+            "best-wpm"
+        );
 
-    const bestAccuracyElement = document.getElementById(
-        "best-accuracy"
-    );
+    const bestAccuracyElement =
+        document.getElementById(
+            "best-accuracy"
+        );
 
-    const totalTestsElement = document.getElementById(
-        "total-tests"
-    );
+    const totalTestsElement =
+        document.getElementById(
+            "total-tests"
+        );
 
-    const averageWpmElement = document.getElementById(
-        "average-wpm"
-    );
+    const averageWpmElement =
+        document.getElementById(
+            "average-wpm"
+        );
 
     historyBody.innerHTML = "";
 
     if (sessions.length === 0) {
 
-    return;
+        return;
 
-}
+    }
 
-startGhostReplay(
-    sessions[0].ghost_data
-);
+    startGhostReplay(
+        sessions[0].ghost_data
+    );
 
-function scheduleInterruption() {
+    let bestWpm = 0;
 
-    console.log("Interruption Scheduled");
-
-    clearTimeout(interruptionTimeout);
-
-    const randomDelay =
-        Math.floor(
-            Math.random() * 10000
-        ) + 5000;
-
-    interruptionTimeout =
-        setTimeout(() => {
-
-            triggerInterruption();
-
-        }, randomDelay);
-
-}
-
-function triggerInterruption() {
-
-    if (testCompleted) return;
-
-    isPaused = true;
-
-    interruptModal.style.display = "flex";
-
-    interruptInput.value = "";
-
-    interruptInput.focus();
-
-}
-
-
-let bestWpm = 0;
-
-let bestAccuracy = 0;
+    let bestAccuracy = 0;
 
     let totalWpm = 0;
 
     sessions.forEach((session) => {
 
         if (session.wpm > bestWpm) {
+
             bestWpm = session.wpm;
+
         }
 
-        if (session.accuracy > bestAccuracy) {
-            bestAccuracy = session.accuracy;
+        if (
+            session.accuracy >
+            bestAccuracy
+        ) {
+
+            bestAccuracy =
+                session.accuracy;
+
         }
 
         totalWpm += session.wpm;
 
-        const row = document.createElement("tr");
+        const row =
+            document.createElement("tr");
 
         row.innerHTML = `
             <td>${session.wpm}</td>
@@ -385,7 +561,8 @@ let bestAccuracy = 0;
         totalWpm / sessions.length
     );
 
-    bestWpmElement.innerText = bestWpm;
+    bestWpmElement.innerText =
+        bestWpm;
 
     bestAccuracyElement.innerText =
         `${bestAccuracy}%`;
@@ -397,6 +574,7 @@ let bestAccuracy = 0;
         averageWpm;
 
 }
+
 
 function startGhostReplay(ghostData) {
 
@@ -439,154 +617,276 @@ function startGhostReplay(ghostData) {
 
 }
 
-hiddenInput.addEventListener("keydown", (event) => {
 
-    if (isPaused) return;
+hiddenInput.addEventListener(
+    "keydown",
+    (event) => {
 
-    if (testCompleted) return;
+        if (testCompleted) return;
 
-    const spans = codeDisplay.querySelectorAll("span");
+        const spans =
+            codeDisplay.querySelectorAll(
+                "span"
+            );
 
-    if (!timerStarted) {
+        if (!timerStarted) {
 
-        startTime = new Date();
+            startTime = new Date();
 
-        startTimer();
+            startTimer();
 
-        timerStarted = true;
+            timerStarted = true;
 
-        scheduleInterruption();
+        }
 
-    }
+        /*
+        BACKSPACE
+        */
 
-    if (event.key === "Backspace") {
+        if (event.key === "Backspace") {
 
-        event.preventDefault();
+            event.preventDefault();
 
-        if (currentIndex > 0) {
+            if (currentIndex > 0) {
 
-            currentIndex--;
+                currentIndex--;
 
-            totalTyped--;
+                const currentSpan =
+                    spans[currentIndex];
 
-            const currentSpan = spans[currentIndex];
+                currentSpan.classList.remove(
+                    "correct"
+                );
 
-            if (currentSpan.classList.contains("incorrect")) {
+                currentSpan.classList.remove(
+                    "incorrect"
+                );
 
-                activeErrors--;
+                updateCaret(spans);
 
+                calculateStats();
 
             }
 
-            currentSpan.classList.remove("correct");
+            return;
 
-            currentSpan.classList.remove("incorrect");
+        }
+
+        /*
+        TAB SUPPORT
+        */
+
+        if (event.key === "Tab") {
+
+            event.preventDefault();
+
+            const startPosition =
+                currentIndex;
+
+            let spacesMatched = 0;
+
+            while (
+                snippet[currentIndex] === " " &&
+                spacesMatched < 4
+            ) {
+
+                const currentSpan =
+                    spans[currentIndex];
+
+                currentSpan.classList.remove(
+                    "correct"
+                );
+
+                currentSpan.classList.remove(
+                    "incorrect"
+                );
+
+                currentSpan.classList.add(
+                    "correct"
+                );
+
+                currentIndex++;
+
+                totalTyped++;
+
+                spacesMatched++;
+
+            }
+
+            tabInsertedPositions.push(
+                startPosition
+            );
 
             updateCaret(spans);
 
             calculateStats();
 
-        }
-
-        return;
-
-    }
-
-    if (event.key.length > 1 && event.key !== "Enter") {
-
-        return;
-
-    }
-
-    event.preventDefault();
-
-    const typedChar = event.key === "Enter"
-        ? "\n"
-        : event.key;
-
-    const expectedChar = snippet[currentIndex];
-
-    const currentSpan = spans[currentIndex];
-
-    totalTyped++;
-
-    const elapsedTime = new Date() - startTime;
-    ghostRecording.push(elapsedTime);
-
-    currentSpan.classList.remove("correct");
-    currentSpan.classList.remove("incorrect");
-
-    if (typedChar === expectedChar) {
-
-    currentSpan.classList.add("correct");
-
-    } else {
-
-    currentSpan.classList.add("incorrect");
-
-    totalErrors++;
-
-    activeErrors++;
-
-    errorsElement.innerText = totalErrors;
-
-    }
-
-    currentIndex++;
-
-    updateCaret(spans);
-
-    calculateStats();
-
-    if (currentIndex >= snippet.length) {
-
-        endTest("Test Completed!");
-
-    }
-
-});
-
-
-restartBtn.addEventListener("click", () => {
-
-    resetTest();
-
-});
-
-
-document.addEventListener("click", () => {
-
-    hiddenInput.focus();
-
-});
-
-interruptInput.addEventListener(
-    "keydown",
-    (event) => {
-
-        if (event.key !== "Enter") {
             return;
+
         }
 
-        const value =
-            interruptInput.value.trim();
+        /*
+        IGNORE SPECIAL KEYS
+        */
 
-        if (value === "dismiss alert") {
+        if (
+            event.key.length > 1 &&
+            event.key !== "Enter"
+        ) {
 
-            interruptModal.style.display =
-                "none";
+            return;
 
-            isPaused = false;
+        }
 
-            hiddenInput.focus();
+        event.preventDefault();
 
-            scheduleInterruption();
+        const typedChar =
+            event.key === "Enter"
+                ? "\n"
+                : event.key;
+
+        const currentTime =
+            Date.now();
+
+        const expectedChar =
+            snippet[currentIndex];
+
+        /*
+        LATENCY TRACKING
+        */
+
+        if (
+            previousKey !== null &&
+            previousKeyTime !== null
+        ) {
+
+            const latency =
+                currentTime -
+                previousKeyTime;
+
+            const transition =
+                `${previousKey}->${typedChar}`;
+
+            if (
+                !keyLatencyMap[
+                    transition
+                ]
+            ) {
+
+                keyLatencyMap[
+                    transition
+                ] = [];
+
+            }
+
+            keyLatencyMap[
+                transition
+            ].push(latency);
+
+        }
+
+        previousKey = typedChar;
+
+        previousKeyTime = currentTime;
+
+        const currentSpan =
+            spans[currentIndex];
+
+        totalTyped++;
+
+        const elapsedTime =
+            new Date() - startTime;
+
+        ghostRecording.push(
+            elapsedTime
+        );
+
+        currentSpan.classList.remove(
+            "correct"
+        );
+
+        currentSpan.classList.remove(
+            "incorrect"
+        );
+
+        /*
+        MATCHING
+        */
+
+        if (
+            typedChar === expectedChar
+        ) {
+
+            currentSpan.classList.add(
+                "correct"
+            );
+
+        } else {
+
+            currentSpan.classList.add(
+                "incorrect"
+            );
+
+            totalErrors++;
+
+            errorsElement.innerText =
+                totalErrors;
+
+        }
+
+        currentIndex++;
+
+        updateCaret(spans);
+
+        calculateStats();
+
+        if (
+            currentIndex >=
+            snippet.length
+        ) {
+
+            endTest(
+                "Test Completed!"
+            );
 
         }
 
     }
 );
 
+
+restartBtn.addEventListener(
+    "click",
+    () => {
+
+        resetTest();
+
+    }
+);
+
+
+document.addEventListener("click", (event) => {
+
+    if (
+        event.target !== languageSelect &&
+        event.target !== hiddenInput
+    ) {
+
+        hiddenInput.focus();
+
+    }
+
+});
+
+
+languageSelect.addEventListener(
+    "change",
+    () => {
+
+        resetTest();
+
+    }
+);
 
 initializeState();
 

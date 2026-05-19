@@ -368,3 +368,65 @@ body {
 
     font-size: 16px;
 }
+
+.recommendation-section {
+    margin-top: 50px;
+
+    background-color: #111827;
+
+    border: 1px solid #1e293b;
+
+    border-radius: 16px;
+
+    padding: 30px;
+}
+
+.recommendation-section h2 {
+    margin-bottom: 20px;
+}
+
+#recommendation-list {
+    list-style: none;
+}
+
+#recommendation-list li {
+    padding: 12px 0;
+
+    border-bottom: 1px solid #1e293b;
+
+    color: #cbd5e1;
+}
+
+.language-selector {
+
+    margin-bottom: 25px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 15px;
+
+}
+
+.language-selector label {
+
+    font-size: 18px;
+
+}
+
+.language-selector select {
+
+    padding: 10px;
+
+    border-radius: 8px;
+
+    border: none;
+
+    background-color: #1e293b;
+
+    color: white;
+
+    font-size: 16px;
+
+}

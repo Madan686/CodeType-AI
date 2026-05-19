@@ -1,78 +1,63 @@
 from app.database.models import (
     db,
-    CodeSnippet
+    Snippet
 )
 
 
 def seed_snippets():
 
-    existing =CodeSnippet.query.first()
+    existing_snippet = Snippet.query.first()
 
-    if existing:
+    if existing_snippet:
+
         return
 
     snippets = [
 
-        CodeSnippet(
-            title="Binary Search",
-            language="Python",
-            difficulty="Intermediate",
-            code="""def binary_search(arr, target):
-    left = 0
-    right = len(arr) - 1
-
-    while left <= right:
-        mid = (left + right) // 2
-
-        if arr[mid] == target:
-            return mid
-
-        elif arr[mid] < target:
-            left = mid + 1
-
-        else:
-            right = mid - 1
-
-    return -1"""
+        Snippet(
+            language="python",
+            difficulty="easy",
+            topic="functions",
+            code="""def greet(name):
+    return f"Hello {name}"
+"""
         ),
 
-        CodeSnippet(
-            title="Bubble Sort",
-            language="Python",
-            difficulty="Beginner",
-            code="""def bubble_sort(arr):
-
-    n = len(arr)
-
-    for i in range(n):
-
-        for j in range(0, n - i - 1):
-
-            if arr[j] > arr[j + 1]:
-
-                arr[j], arr[j + 1] = arr[j + 1], arr[j]
-
-    return arr"""
+        Snippet(
+            language="python",
+            difficulty="medium",
+            topic="loops",
+            code="""for i in range(5):
+    print(i)
+"""
         ),
 
-        CodeSnippet(
-            title="Flask API Route",
-            language="Python",
-            difficulty="Intermediate",
-            code="""from flask import Flask, jsonify
+        Snippet(
+            language="java",
+            difficulty="easy",
+            topic="classes",
+            code="""public class Main {
 
-app = Flask(__name__)
+    public static void main(String[] args) {
 
-@app.route("/")
+        System.out.println("Hello");
 
-def home():
+    }
 
-    return jsonify({
-        "message": "Hello World"
-    })
+}
+"""
+        ),
 
-if __name__ == "__main__":
-    app.run(debug=True)"""
+        Snippet(
+            language="javascript",
+            difficulty="easy",
+            topic="functions",
+            code="""function greet(name) {
+
+    return `Hello ${name}`;
+
+}
+"""
         )
 
     ]
@@ -80,3 +65,5 @@ if __name__ == "__main__":
     db.session.add_all(snippets)
 
     db.session.commit()
+
+    print("Snippets Seeded Successfully")

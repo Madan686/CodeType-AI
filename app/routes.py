@@ -7,11 +7,11 @@ from flask import (
 from app.database.models import (
     db,
     TypingSession,
-    CodeSnippet
+    Snippet
 )
 
-import json
 import random
+
 
 def register_routes(app):
 
@@ -26,20 +26,22 @@ def register_routes(app):
 
         data = request.get_json()
 
-        new_session = TypingSession(
+        session = TypingSession(
+
             wpm=data["wpm"],
             accuracy=data["accuracy"],
             total_errors=data["total_errors"],
             total_typed=data["total_typed"],
-            ghost_data=json.dumps(data["ghost_data"])
+            language=data["language"]
+
         )
 
-        db.session.add(new_session)
+        db.session.add(session)
 
         db.session.commit()
 
         return jsonify({
-            "message": "Session saved successfully"
+            "message": "Session Saved"
         })
 
 
@@ -50,21 +52,59 @@ def register_routes(app):
             TypingSession.created_at.desc()
         ).all()
 
-        return jsonify([
-            session.to_dict()
-            for session in sessions
-        ])
-    
+        result = []
+
+        for session in sessions:
+
+            result.append({
+
+                "wpm": session.wpm,
+
+                "accuracy": session.accuracy,
+
+                "total_errors": session.total_errors,
+
+                "total_typed": session.total_typed,
+
+                "language": session.language,
+
+                "created_at": session.created_at.strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+
+            })
+
+        return jsonify(result)
+
+
     @app.route("/random-snippet")
     def random_snippet():
 
-        snippets = CodeSnippet.query.all()
-        
+        language = request.args.get(
+            "language",
+            "python"
+        )
+
+        snippets = Snippet.query.filter_by(
+            language=language
+        ).all()
+
         if not snippets:
+
             return jsonify({
-                "message": "No snippets available"
-            }), 404
+                "error": "No snippets found"
+            }), 400
 
         snippet = random.choice(snippets)
 
-        return jsonify(snippet.to_dict())
+        return jsonify({
+
+            "language": snippet.language,
+
+            "difficulty": snippet.difficulty,
+
+            "topic": snippet.topic,
+
+            "code": snippet.code
+
+        })
